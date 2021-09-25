@@ -6,6 +6,8 @@ export const MESSAGES = {
   FACULTIES: "750479362620522588",
 };
 
+export const MEMES_CHANNEL_ID = "750352686104182884";
+
 export const ROLES = [
   {
     name: "IT",
@@ -38,3 +40,5 @@ export const ROLES = [
     id: "750370786841460808",
   },
 ];
+
+export const blacklistedMemers: string[] = [];
