@@ -1,20 +1,21 @@
 import * as dotenv from "dotenv";
 import {
   Client,
-  Message,
+  GuildChannel,
   MessageReaction,
-  ReactionEmoji,
+  MessageSelectMenu,
   TextChannel,
   User,
 } from "discord.js";
 import {
-  blacklistedMemers,
   BTU_GUILD_ID,
+  GAMING_ROLES_CHANNEL_ID,
   MEMES_CHANNEL_ID,
   MESSAGES,
-  ROLES,
   ROLES_CHANNEL_ID,
+  WATCHING_MESSAGES,
 } from "./consts";
+import { handleMemes, isMeme, processMessageReaction } from "./utils";
 
 dotenv.config();
 
@@ -32,42 +33,28 @@ const client = new Client({
   ],
 });
 
-client.on("ready", () => {
+client.on("ready", async () => {
   console.log(`BTU bot is on ✅`);
 
   client.user?.setActivity("BTU", { type: "WATCHING" });
 
-  client.guilds.fetch(BTU_GUILD_ID).then((guild) =>
-    guild.channels.fetch(ROLES_CHANNEL_ID).then((channel) => {
-      (channel as TextChannel).messages.fetch(MESSAGES.COURSES);
-      (channel as TextChannel).messages.fetch(MESSAGES.FACULTIES);
-    })
-  );
+  const guild = await client.guilds.fetch(BTU_GUILD_ID);
+  const rolesChannel = (await guild.channels.fetch(
+    ROLES_CHANNEL_ID
+  )) as TextChannel;
+  const memesChannel = (await guild.channels.fetch(
+    MEMES_CHANNEL_ID
+  )) as TextChannel;
+  const gamingRolesChannel = (await guild.channels.fetch(
+    GAMING_ROLES_CHANNEL_ID
+  )) as TextChannel;
+
+  (async () => {
+    await rolesChannel.messages.fetch();
+    await gamingRolesChannel.messages.fetch();
+    console.log("Fetched all messages");
+  })();
 });
-
-const processMessageReaction = (
-  reaction: MessageReaction,
-  user: User,
-  action: "add" | "remove"
-) => {
-  if (
-    ![MESSAGES.COURSES, MESSAGES.FACULTIES].includes(reaction.message.id) ||
-    !reaction.emoji.name
-  ) {
-    return;
-  }
-
-  const roleId = ROLES.find((r) => r.emoji === reaction.emoji.name)?.id;
-  const role = reaction.message.guild?.roles.cache.find((r) => r.id === roleId);
-
-  if (!role) {
-    return;
-  }
-
-  const member = reaction.message.guild?.members.cache.get(user.id);
-
-  action === "add" ? member?.roles.add(role) : member?.roles.remove(role);
-};
 
 client.on("messageReactionAdd", (reaction, user) =>
   processMessageReaction(reaction as MessageReaction, user as User, "add")
@@ -77,42 +64,9 @@ client.on("messageReactionRemove", (reaction, user) =>
   processMessageReaction(reaction as MessageReaction, user as User, "remove")
 );
 
-const isMeme = (message: Message) =>
-  message.attachments.size > 0 ||
-  message.embeds.length > 0 ||
-  message.content.match(/\.(jpe?g|png|gif|webp|bmp|tiff?)$/i);
-
 client.on("messageCreate", async (message) => {
-  if (message.channelId != MEMES_CHANNEL_ID || !isMeme(message)) {
-    return;
-  }
-
-  if (blacklistedMemers.includes(message.author.id)) {
-    const msg = await message.reply(
-      `${message.author} you are blacklisted from this sending memes. 😓`
-    );
-
-    setTimeout(() => msg.delete(), 5000);
-
-    await message.delete();
-  }
-
-  await message.react("😆");
-  await message.react("💩");
-  message
-    .awaitReactions({
-      filter: (reaction) => reaction.emoji.name === "💩",
-      max: 5,
-      time: 30 * 1000,
-    })
-    .then(async (reactions) => {
-      if (reactions.size > 4) {
-        blacklistedMemers.push(message.author.id);
-        await message.channel.send(
-          `${message.author} has been blacklisted from sending memes 😔`
-        );
-      }
-    });
+  if (message.channelId === MEMES_CHANNEL_ID && isMeme(message))
+    handleMemes(message);
 });
 
 client.login(process.env.DISCORD_TOKEN);
