@@ -1,21 +1,18 @@
 import * as dotenv from "dotenv";
-import {
-  Client,
-  GuildChannel,
-  MessageReaction,
-  MessageSelectMenu,
-  TextChannel,
-  User,
-} from "discord.js";
+import { Client, MessageReaction, TextChannel, User } from "discord.js";
 import {
   BTU_GUILD_ID,
   GAMING_ROLES_CHANNEL_ID,
   MEMES_CHANNEL_ID,
-  MESSAGES,
   ROLES_CHANNEL_ID,
-  WATCHING_MESSAGES,
 } from "./consts";
-import { handleMemes, isMeme, processMessageReaction } from "./utils";
+import {
+  handleMemes,
+  handleMessageCreate,
+  isMeme,
+  processMessageReaction,
+} from "./utils";
+import SocialCreditSystem from "./scs";
 
 dotenv.config();
 
@@ -54,6 +51,24 @@ client.on("ready", async () => {
     await gamingRolesChannel.messages.fetch();
     console.log("Fetched all messages");
   })();
+
+  const scs = new SocialCreditSystem();
+
+  guild.members.fetch().then((members) => {
+    members.forEach(async (member) => {
+      if (member.user.bot) return;
+
+      const acc = await scs.getAccount(member.id);
+
+      if (!acc) {
+        scs.addAccount({
+          id: member.user.id,
+          username: `${member.user.username}#${member.user.discriminator}`,
+          credit: 100,
+        });
+      }
+    });
+  });
 });
 
 client.on("messageReactionAdd", (reaction, user) =>
@@ -67,6 +82,8 @@ client.on("messageReactionRemove", (reaction, user) =>
 client.on("messageCreate", async (message) => {
   if (message.channelId === MEMES_CHANNEL_ID && isMeme(message))
     handleMemes(message);
+
+  handleMessageCreate(message);
 });
 
 client.login(process.env.DISCORD_TOKEN);

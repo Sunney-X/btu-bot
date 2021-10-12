@@ -1,10 +1,6 @@
 import { Message, MessageReaction, User } from "discord.js";
-import {
-  blacklistedMemers,
-  MESSAGES,
-  ROLES,
-  WATCHING_MESSAGES,
-} from "./consts";
+import { blacklistedMemers, ROLES, WATCHING_MESSAGES } from "./consts";
+import SocialCreditSystem from "./scs";
 
 export const isMeme = (message: Message) =>
   message.attachments.size > 0 ||
@@ -67,4 +63,28 @@ export const handleMemes = async (message: Message) => {
         );
       }
     });
+};
+
+export const handleMessageCreate = async (message: Message) => {
+  const scs = new SocialCreditSystem();
+  // scs
+  //   .getBalance(message.author.id)
+  //   .then((balance) =>
+  //     console.log(`${message.author.username} has ${balance}`)
+  //   );
+
+  if (message.content.startsWith("!balance")) {
+    const balance = await scs.getBalance(message.author.id);
+    await message.reply(`You have ${balance} Social Credits 💹`);
+    await scs.modifyBalance(message.author.id, -1);
+    await message.reply(`You have lost 1 Social Credit 💹 😡👮`);
+  }
+
+  if (isMeme(message)) {
+    await handleMemes(message);
+    await scs.modifyBalance(message.author.id, 10);
+    message.reply(
+      `<@${message.author.id}>  you have been awarded 10 Social Credit for sending a meme 😎💹`
+    );
+  }
 };
